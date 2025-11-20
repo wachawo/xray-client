@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import ipaddress
 import os
 import re
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 from typing import Tuple, List, Dict
 
@@ -196,6 +198,45 @@ def install_docker(dry_run: bool):
             pass
 
 
+# --------------------- Geoip Download ---------------------
+
+def download_geoip_files(dry_run: bool):
+    """Download geoip.dat and geosite.dat to local geoip folder."""
+    geoip_dir = CLIENT_DIR / 'geoip'
+    files = {
+        'geoip.dat': (
+            'https://github.com/Loyalsoldier/v2ray-rules-dat/'
+            'raw/release/geoip.dat'
+        ),
+        'geosite.dat': (
+            'https://github.com/Loyalsoldier/v2ray-rules-dat/'
+            'raw/release/geosite.dat'
+        ),
+    }
+
+    print('Downloading geoip files...')
+    if dry_run:
+        print(f'(dry-run) Would create {geoip_dir}')
+        for name in files:
+            print(f'(dry-run) Would download {name}')
+        return
+
+    # Ensure geoip directory exists
+    geoip_dir.mkdir(exist_ok=True)
+
+    for name, url in files.items():
+        dest = geoip_dir / name
+        try:
+            print(f'  Downloading {name}...')
+            with urllib.request.urlopen(url) as response:
+                content = response.read()
+                dest.write_bytes(content)
+                # Calculate MD5
+                md5 = hashlib.md5(content).hexdigest()
+                print(f'  {name} (MD5: {md5[:16]}...)')
+        except Exception as e:
+            print(f'  Warning: failed to download {name}: {e}')
+
 # --------------------- Confirmation ---------------------
 
 def confirm_settings(
@@ -335,6 +376,9 @@ def main():
     enable_ip_forward(dry_run)
     firewall_forward_accept(dry_run)
     install_docker(dry_run)
+
+    # Download geoip files
+    download_geoip_files(dry_run)
 
     # docker compose
     compose_file = CLIENT_DIR / 'docker-compose.yml'

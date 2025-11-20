@@ -91,3 +91,12 @@ curl http://ifconfig.me/ip --interface tun0
 ```bash
 docker compose logs -f xray_server xray_tun2socks
 ```
+
+### 11. Uninstall (cleanup)
+```bash
+cd /opt/xray/client
+sudo python3 uninstall.py   # interactive confirmation
+sudo python3 uninstall.py --yes          # no prompt
+sudo python3 uninstall.py --remove-env   # also delete .env
+sudo python3 uninstall.py --dry-run      # show what would happen
+```

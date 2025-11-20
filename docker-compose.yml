@@ -43,6 +43,7 @@ services:
       - noc.solutions
     volumes:
       - ./config_client.json:/etc/xray/config.json
+      - ./geoip:/usr/share/xray
     network_mode: host
     logging:
       driver: "json-file"

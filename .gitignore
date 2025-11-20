@@ -2,3 +2,6 @@ idea/
 vscode/
 .env
 config_client.json
+__pycache__/
+*.pyc
+.DS_Store
