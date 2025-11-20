@@ -1,0 +1,51 @@
+version: "3.7"
+services:
+  xray_tun2socks:
+    build:
+      context: ./tun2socks
+      args:
+        ARCH: ${ARCH:-amd64}        # Architecture: arm64, amd64
+    container_name: xray_tun2socks
+    hostname: xray_tun2socks
+    restart: always
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    dns:
+      - 8.8.8.8
+    dns_search:
+      - noc.solutions
+    environment:
+      IFACE: ${IFACE:-enp3s0}      # Interface
+      LAN: ${LAN:-192.168.0.0/24}   # Local Area Network
+      ADDR: ${ADDR:-192.168.0.254}  # Server Address
+    volumes:
+      - ./tun2socks/main.sh:/main.sh
+    network_mode: host
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "128m"
+        max-file: "3"
+  xray_server:
+    image: teddysun/xray:latest
+    container_name: xray_server
+    hostname: xray_server
+    restart: always
+    #ports:
+    #  - "1080:1080"
+    #  - "3128:3128"
+    #  - "12345:12345"
+    dns:
+      - 8.8.8.8
+    dns_search:
+      - noc.solutions
+    volumes:
+      - ./config_client.json:/etc/xray/config.json
+    network_mode: host
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "128m"
+        max-file: "3"

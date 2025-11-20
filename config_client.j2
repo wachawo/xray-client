@@ -1,0 +1,124 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "routing": {
+    "domainMatcher": "mph",
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "ip": [
+          "geoip:private",
+          "geoip:ru"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "2ip.noc.solutions",
+          "geosite:amazon",
+          "geosite:apple",
+          "geosite:disney",
+          "geosite:discord",
+          "geosite:facebook",
+          "geosite:google",
+          "geosite:hulu",
+          "geosite:instagram",
+          "geosite:meta",
+          "geosite:netflix",
+          "geosite:openai",
+          "geosite:playstation",
+          "geosite:primevideo",
+          "geosite:steam",
+          "geosite:threads",
+          "geosite:telegram",
+          "geosite:twitter",
+          "geosite:youtube",
+          "geosite:wikimedia"
+        ],
+        "outboundTag": "{{ domain_outbound_tag }}"
+      }
+    ]
+  },
+  "dns": {
+    "hosts": {
+      "dns.google": "8.8.8.8"
+    },
+    "servers": [
+      "8.8.8.8",
+      "localhost"
+    ]
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": 12345,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "network": "tcp,udp",
+        "followRedirect": true
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tproxy": "tproxy"
+        }
+      }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 1080,
+      "protocol": "socks",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      },
+      "settings": {
+        "auth": "noauth",
+        "udp": true
+      }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 3128,
+      "protocol": "http",
+      "settings": {
+        "auth": "noauth"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    }{% if servers %},{% endif %}
+{% for s in servers %}
+    {
+      "tag": "{{ s.tag }}",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "{{ s.host }}",
+            "port": 8080,
+            "users": [
+              {
+                "id": "{{ s.uuid }}",
+                "encryption": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp"
+      }
+    }{% if not loop.last %},{% endif %}
+{% endfor %}
+  ]
+}
