@@ -172,7 +172,37 @@ def install_docker(dry_run: bool):
                 os_release[k] = v.strip('"')
     distro = os_release.get('ID', '')
     print(f'Detected distro: {distro}')
-    if distro == 'raspbian':
+
+    if distro == 'ubuntu':
+        print('Configuring Docker repository for Ubuntu...')
+        run(['apt', 'update'], dry_run=dry_run)
+        run(['apt', 'install', '-y', 'ca-certificates', 'curl'], dry_run=dry_run)
+        if not dry_run:
+            Path('/etc/apt/keyrings').mkdir(mode=0o755, parents=True, exist_ok=True)
+        run(['curl', '-fsSL', 'https://download.docker.com/linux/ubuntu/gpg', '-o', '/etc/apt/keyrings/docker.asc'], dry_run=dry_run)
+        if not dry_run:
+            os.chmod('/etc/apt/keyrings/docker.asc', 0o644) # a+r
+
+        codename = os_release.get('UBUNTU_CODENAME') or os_release.get('VERSION_CODENAME')
+        if not codename:
+            raise RuntimeError("Could not determine Ubuntu codename")
+
+        repo_content = f"""
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: {codename}
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+"""
+        if dry_run:
+            print(f"Would write to /etc/apt/sources.list.d/docker.sources:\n{repo_content}")
+        else:
+            Path('/etc/apt/sources.list.d/docker.sources').write_text(repo_content)
+
+        run(['apt', 'update'], dry_run=dry_run)
+        run(['apt', 'install', '-y', 'docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-compose-plugin'], dry_run=dry_run)
+
+    elif distro == 'raspbian':
         run(['apt', 'update'], dry_run=dry_run)
         run(['apt', 'install', '-y', 'ca-certificates', 'curl', 'gnupg'], dry_run=dry_run)
         if not dry_run:
@@ -188,14 +218,17 @@ def install_docker(dry_run: bool):
         run(['apt', 'update'], dry_run=dry_run)
         run(['apt', 'install', '-y', 'docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-buildx-plugin', 'docker-compose-plugin'], dry_run=dry_run)
     else:  # debian or fallback
+        print(f'Using generic Docker install for {distro or "unknown distro"}')
         run(['apt', 'update'], dry_run=dry_run)
         run(['apt', 'install', '-y', 'docker.io', 'docker-compose'], dry_run=dry_run)
     run(['systemctl', 'enable', '--now', 'docker'], dry_run=dry_run, check=False)
     if not dry_run:
         try:
-            subprocess.run(['usermod', '-aG', 'docker', os.environ.get('SUDO_USER', os.environ.get('USER','root'))])
-        except Exception:
-            pass
+            user = os.environ.get('SUDO_USER', os.environ.get('USER','root'))
+            print(f"Adding user {user} to docker group")
+            subprocess.run(['usermod', '-aG', 'docker', user])
+        except Exception as e:
+            print(f"Warning: could not add user to docker group: {e}")
 
 
 # --------------------- Geoip Download ---------------------
