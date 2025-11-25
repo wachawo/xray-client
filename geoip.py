@@ -15,10 +15,10 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 GEOIP_DIR = SCRIPT_DIR / "geoip"
 FILES = {
     "geoip.dat": (
-        "https://github.com/Loyalsoldier/v2ray-rules-dat/" "raw/release/geoip.dat"
+        "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geoip.dat"
     ),
     "geosite.dat": (
-        "https://github.com/Loyalsoldier/v2ray-rules-dat/" "raw/release/geosite.dat"
+        "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geosite.dat"
     ),
 }
 
