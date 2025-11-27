@@ -9,19 +9,20 @@ import sys
 import urllib.request
 from pathlib import Path
 from typing import Optional
+
 CONTAINER = "xray_server"
 SCRIPT_DIR = Path(__file__).parent.resolve()
 GEOIP_DIR = SCRIPT_DIR / "geoip"
 FILES = {
     "geoip.dat": (
-        "https://github.com/Loyalsoldier/v2ray-rules-dat/"
-        "raw/release/geoip.dat"
+        "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geoip.dat"
     ),
     "geosite.dat": (
-        "https://github.com/Loyalsoldier/v2ray-rules-dat/"
-        "raw/release/geosite.dat"
+        "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geosite.dat"
     ),
 }
+
+
 def run_command(
     cmd: list[str], check: bool = True, capture: bool = True
 ) -> Optional[str]:
@@ -39,11 +40,13 @@ def run_command(
         if check:
             raise
         return None
+
+
 def docker_available() -> bool:
     """Check if docker command is available."""
-    return run_command(
-        ["which", "docker"], check=False, capture=True
-    ) is not None
+    return run_command(["which", "docker"], check=False, capture=True) is not None
+
+
 def container_exists(name: str) -> bool:
     """Check if Docker container exists."""
     output = run_command(
@@ -54,6 +57,8 @@ def container_exists(name: str) -> bool:
     if not output:
         return False
     return name in output.splitlines()
+
+
 def get_file_md5(filepath: Path) -> str:
     """Calculate MD5 hash of a local file."""
     hash_md5 = hashlib.md5()
@@ -61,6 +66,8 @@ def get_file_md5(filepath: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
 def download_file(url: str, dest: Path) -> bool:
     """Download file from URL to destination path."""
     try:
@@ -71,17 +78,19 @@ def download_file(url: str, dest: Path) -> bool:
     except Exception as e:
         print(f"Warning: failed to download {url} - {e}")
         return False
+
+
 def restart_container(container: str) -> bool:
     """Restart Docker container."""
     try:
         print(f"Restarting container {container}...")
-        run_command(
-            ["docker", "restart", container], check=True, capture=False
-        )
+        run_command(["docker", "restart", container], check=True, capture=False)
         return True
     except Exception as e:
         print(f"Error restarting container: {e}")
         return False
+
+
 def main() -> int:
     """Main entry point."""
     # Check Docker availability
@@ -127,5 +136,7 @@ def main() -> int:
     else:
         print("No updates found. No restart needed.")
     return 0
+
+
 if __name__ == "__main__":
     sys.exit(main())
