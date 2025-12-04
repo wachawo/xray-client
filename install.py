@@ -337,10 +337,10 @@ def download_geoip_files(dry_run: bool):
     geoip_dir = CLIENT_DIR / "geoip"
     files = {
         "geoip.dat": (
-            "https://github.com/Loyalsoldier/v2ray-rules-dat/" "raw/release/geoip.dat"
+            "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geoip.dat"
         ),
         "geosite.dat": (
-            "https://github.com/Loyalsoldier/v2ray-rules-dat/" "raw/release/geosite.dat"
+            "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geosite.dat"
         ),
     }
 
@@ -516,6 +516,7 @@ def main():
             run(["docker", "compose", "up", "-d"], dry_run=False, check=False)
 
     print("Done.")
+    print("Run and Startup:\n  docker-compose up -d")
     print("Test SOCKS5: curl http://ifconfig.me/ip --socks5 127.0.0.1:1080")
     print("Test via tun (if tun0): curl http://ifconfig.me/ip --interface tun0")
     return 0
