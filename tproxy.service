@@ -1,7 +1,16 @@
+[Unit]
+Description=TPROXY Routing Rules for Xray
+Wants=network-online.target
+After=network-online.target
+
 [Service]
 Type=oneshot
+User=root
 EnvironmentFile=/opt/xray/.env
 ExecStart=/opt/xray/tproxy.sh
 RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
 [Install]
 WantedBy=multi-user.target

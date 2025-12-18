@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# systemctl daemon-reload
+# systemctl enable --now /opt/xray/tproxy.service
+# chmod +x /opt/xray/tproxy.sh
+# git update-index --chmod=+x tproxy.sh
 ENV_FILE="/opt/xray/.env"
 # shellcheck source=src/util.sh
 [ -f "$ENV_FILE" ] && set -a && . "$ENV_FILE" && set +a
