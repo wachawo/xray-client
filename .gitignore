@@ -1,7 +1,10 @@
 idea/
 vscode/
-.env
-config_client.json
 __pycache__/
 *.pyc
+*.log
+.env
+config_client.json
 .DS_Store
+TPROXY.txt
+WAREGUARD.txt
