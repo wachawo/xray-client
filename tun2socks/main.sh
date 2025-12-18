@@ -40,7 +40,8 @@ ip route add "$LAN" dev "$IFACE" table 100
 ip route add 127.0.0.1/32 dev lo table 100
 
 echo "Add rules to tun2socks..."
-ip rule add fwmark 100 lookup 100
+ip rule del pref 100 || true
+ip rule add pref 100 fwmark 100 lookup 100
 
 echo "Display tun2socks routes..."
 ip route show table 100
