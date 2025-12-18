@@ -21,7 +21,7 @@ sleep 3
 ip link set tun0 up
 
 echo "Flush existing iptables mangle PREROUTING rules..."
-iptables -t mangle -F PREROUTING
+iptables -t mangle -D PREROUTING -i "$IFACE" -s "$LAN" ! -d "$ADDR" -j MARK --set-mark 100 || true
 echo "Add iptables rules..."
 iptables -t mangle -A PREROUTING -i "$IFACE" -s "$LAN" ! -d "$ADDR" -j MARK --set-mark 100
 
