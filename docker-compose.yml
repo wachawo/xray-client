@@ -6,6 +6,7 @@ services:
       args:
         ARCH: ${ARCH:-amd64} # Architecture: arm64, amd64
     image: xray_tun2socks
+    pull_policy: never
     container_name: xray_tun2socks
     hostname: xray_tun2socks
     restart: always
