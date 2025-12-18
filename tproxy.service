@@ -1,0 +1,5 @@
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/xray/.env
+ExecStart=/usr/local/sbin/tproxy.sh
+RemainAfterExit=yes
