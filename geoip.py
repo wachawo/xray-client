@@ -3,12 +3,26 @@
 Download geoip.dat and geosite.dat to local geoip folder
 and restart container if files changed
 """
+import logging
 import hashlib
 import subprocess
 import sys
 import urllib.request
 from pathlib import Path
 from typing import Optional
+
+LOGGING = {
+    "handlers": [
+        logging.StreamHandler(),
+        # logging.FileHandler(filename='app.log', mode='a', encoding='utf-8'),
+    ],
+    "format": "%(asctime)s.%(msecs)03d [%(levelname)s]: (%(name)s.%(funcName)s) %(message)s",
+    "level": logging.INFO,
+    "datefmt": "%Y-%m-%d %H:%M:%S",
+}
+logging.basicConfig(**LOGGING)
+logger = logging.getLogger(__name__)
+
 
 CONTAINER = "xray_server"
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -71,23 +85,23 @@ def get_file_md5(filepath: Path) -> str:
 def download_file(url: str, dest: Path) -> bool:
     """Download file from URL to destination path."""
     try:
-        print(f"Downloading {dest.name} ...")
+        logger.info(f"Downloading {dest.name} ...")
         with urllib.request.urlopen(url) as response:
             dest.write_bytes(response.read())
         return True
     except Exception as e:
-        print(f"Warning: failed to download {url} - {e}")
+        logger.warning(f"failed to download {url} - {e}")
         return False
 
 
 def restart_container(container: str) -> bool:
     """Restart Docker container."""
     try:
-        print(f"Restarting container {container}...")
+        logger.info(f"Restarting container {container}...")
         run_command(["docker", "restart", container], check=True, capture=False)
         return True
     except Exception as e:
-        print(f"Error restarting container: {e}")
+        logger.error(f"Error restarting container: {e}")
         return False
 
 
@@ -95,11 +109,11 @@ def main() -> int:
     """Main entry point."""
     # Check Docker availability
     if not docker_available():
-        print("Error: docker command not found in PATH")
+        logger.error("docker command not found in PATH")
         return 1
     # Check container existence
     if not container_exists(CONTAINER):
-        print(f"Error: container {CONTAINER} not found")
+        logger.error(f"container {CONTAINER} not found")
         return 1
     # Ensure geoip directory exists
     GEOIP_DIR.mkdir(exist_ok=True)
@@ -110,31 +124,31 @@ def main() -> int:
         # Get current MD5 if file exists
         if dest.exists():
             old_md5 = get_file_md5(dest)
-            print(f"Current {name} MD5: {old_md5}")
+            logger.info(f"Current {name} MD5: {old_md5}")
         # Download file to temporary location first
         temp_dest = dest.with_suffix(dest.suffix + ".tmp")
         if not download_file(url, temp_dest):
             continue
         # Calculate new MD5
         new_md5 = get_file_md5(temp_dest)
-        print(f"Downloaded {name} MD5: {new_md5}")
+        logger.info(f"Downloaded {name} MD5: {new_md5}")
         # Compare and update if different or missing
         if new_md5 != old_md5:
-            print(f"File {name} has changed - updating local copy...")
+            logger.info(f"File {name} has changed - updating local copy...")
             temp_dest.replace(dest)
             changed = True
         else:
-            print(f"{name} is up to date")
+            logger.info(f"{name} is up to date")
             temp_dest.unlink()
     # Restart container if any file was updated
     if changed:
         if restart_container(CONTAINER):
-            print("Done: files updated and container restarted.")
+            logger.info("Done: files updated and container restarted.")
         else:
-            print("Warning: files updated but restart failed.")
+            logger.warning("files updated but restart failed.")
             return 1
     else:
-        print("No updates found. No restart needed.")
+        logger.info("No updates found. No restart needed.")
     return 0
 
 
