@@ -5,6 +5,7 @@ services:
       context: ./tun2socks
       args:
         ARCH: ${ARCH:-amd64} # Architecture: arm64, amd64
+    image: xray_tun2socks
     container_name: xray_tun2socks
     hostname: xray_tun2socks
     restart: always
@@ -48,6 +49,7 @@ services:
     environment:
       - TZ=America/New_York
     volumes:
+      - /lib/modules:/lib/modules:ro
       - ./config_client.json:/etc/xray/config.json
       - ./geoip:/usr/share/xray
     logging:
