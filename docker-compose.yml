@@ -4,25 +4,27 @@ services:
     build:
       context: ./tun2socks
       args:
-        ARCH: ${ARCH:-amd64}        # Architecture: arm64, amd64
+        ARCH: ${ARCH:-amd64} # Architecture: arm64, amd64
     container_name: xray_tun2socks
     hostname: xray_tun2socks
     restart: always
+    network_mode: host
     privileged: true
     cap_add:
       - NET_ADMIN
+      - NET_RAW
       - SYS_MODULE
     dns:
       - 8.8.8.8
     dns_search:
       - noc.solutions
     environment:
-      IFACE: ${IFACE:-enp3s0}      # Interface
-      LAN: ${LAN:-192.168.0.0/24}   # Local Area Network
-      ADDR: ${ADDR:-192.168.0.254}  # Server Address
+      TZ: America/New_York
+      IFACE: ${IFACE:-enp3s0} # Interface
+      LAN: ${LAN:-192.168.0.0/24} # Local Area Network
+      ADDR: ${ADDR:-192.168.0.254} # Server Address
     volumes:
       - ./tun2socks/main.sh:/main.sh
-    network_mode: host
     logging:
       driver: "json-file"
       options:
@@ -33,18 +35,21 @@ services:
     container_name: xray_server
     hostname: xray_server
     restart: always
-    #ports:
-    #  - "1080:1080"
-    #  - "3128:3128"
-    #  - "12345:12345"
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_MODULE
     dns:
       - 8.8.8.8
     dns_search:
       - noc.solutions
+    environment:
+      - TZ=America/New_York
     volumes:
       - ./config_client.json:/etc/xray/config.json
       - ./geoip:/usr/share/xray
-    network_mode: host
     logging:
       driver: "json-file"
       options:

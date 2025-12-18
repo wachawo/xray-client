@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import hashlib
+import logging
 import ipaddress
 import os
 import re
@@ -18,6 +19,18 @@ except ImportError:
     print("Missing Jinja2. Install with: pip install jinja2 or use requirements.txt.")
     sys.exit(1)
 
+LOGGING = {
+    "handlers": [
+        logging.StreamHandler(),
+        # logging.FileHandler(filename='app.log', mode='a', encoding='utf-8'),
+    ],
+    "format": "%(asctime)s.%(msecs)03d [%(levelname)s]: (%(name)s.%(funcName)s) %(message)s",
+    "level": logging.INFO,
+    "datefmt": "%Y-%m-%d %H:%M:%S",
+}
+logging.basicConfig(**LOGGING)
+logger = logging.getLogger(__name__)
+
 CLIENT_DIR = Path(__file__).resolve().parent
 ENV_FILE = CLIENT_DIR / ".env"
 TEMPLATE_FILE = CLIENT_DIR / "config_client.j2"
@@ -31,11 +44,12 @@ REQUIRED_ENV_KEYS = [
     "SERVERS",
 ]  # SERVERS is CSV host:uuid pairs
 
-# --------------------- Utility ---------------------
+
+# Utility
 
 
 def run(cmd: List[str], dry_run: bool = False, check: bool = True):
-    print("+", " ".join(cmd))
+    logger.info(f"+ {' '.join(cmd)}")
     if dry_run:
         return ""
     result = subprocess.run(
@@ -94,7 +108,7 @@ def detect_arch() -> str:
     return run(["dpkg", "--print-architecture"])
 
 
-# --------------------- .env Handling ---------------------
+# .env Handling
 
 
 def load_env() -> Dict[str, str]:
@@ -112,7 +126,7 @@ def load_env() -> Dict[str, str]:
 
 def write_env(env: Dict[str, str], dry_run: bool):
     content = "\n".join(f"{k}={env[k]}" for k in REQUIRED_ENV_KEYS if k in env) + "\n"
-    print("Writing .env:\n" + content)
+    logger.info(f"Writing .env:\n{content}")
     if not dry_run:
         ENV_FILE.write_text(content)
 
@@ -153,7 +167,7 @@ def servers_from_env_value(value: str) -> List[Dict[str, str]]:
     return result
 
 
-# --------------------- Template Rendering ---------------------
+# Template Rendering
 
 
 def render_template(
@@ -176,19 +190,19 @@ def render_template(
     rendered = template.render(
         servers=tagged_servers, domain_outbound_tag=domain_outbound_tag
     )
-    print(f"Rendered config_client.json ({len(rendered)} bytes)")
+    logger.info(f"Rendered config_client.json ({len(rendered)} bytes)")
     if dry_run:
-        print(rendered[:800] + ("..." if len(rendered) > 800 else ""))
+        logger.info(rendered[:800] + ("..." if len(rendered) > 800 else ""))
     else:
         OUTPUT_CONFIG.write_text(rendered)
 
 
-# --------------------- Docker / system ---------------------
+# Docker / system
 
 
 def enable_ip_forward(dry_run: bool):
     sysctl_conf = "/etc/sysctl.d/99-xray.conf"
-    print("Enable IPv4 forwarding")
+    logger.info("Enable IPv4 forwarding")
     if not dry_run:
         Path(sysctl_conf).write_text("net.ipv4.ip_forward=1\n")
         run(["sysctl", "-p", sysctl_conf], dry_run=False)
@@ -221,10 +235,10 @@ def install_docker(dry_run: bool):
                 k, v = line.strip().split("=", 1)
                 os_release[k] = v.strip('"')
     distro = os_release.get("ID", "")
-    print(f"Detected distro: {distro}")
+    logger.info(f"Detected distro: {distro}")
 
     if distro == "ubuntu":
-        print("Configuring Docker repository for Ubuntu...")
+        logger.info("Configuring Docker repository for Ubuntu...")
         run(["apt", "update"], dry_run=dry_run)
         run(["apt", "install", "-y", "ca-certificates", "curl"], dry_run=dry_run)
         if not dry_run:
@@ -256,7 +270,7 @@ Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 """
         if dry_run:
-            print(
+            logger.info(
                 f"Would write to /etc/apt/sources.list.d/docker.sources:\n{repo_content}"
             )
         else:
@@ -271,6 +285,7 @@ Signed-By: /etc/apt/keyrings/docker.asc
                 "docker-ce",
                 "docker-ce-cli",
                 "containerd.io",
+                "docker-buildx-plugin",
                 "docker-compose-plugin",
             ],
             dry_run=dry_run,
@@ -298,7 +313,7 @@ Signed-By: /etc/apt/keyrings/docker.asc
             os.chmod("/etc/apt/keyrings/docker.asc", 0o644)
         line = f"deb [arch={run(['dpkg','--print-architecture'])} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian {os_release.get('VERSION_CODENAME','stable')} stable"
         if dry_run:
-            print(line)
+            logger.info(line)
         else:
             Path("/etc/apt/sources.list.d/docker.list").write_text(line + "\n")
         run(["apt", "update"], dry_run=dry_run)
@@ -315,21 +330,50 @@ Signed-By: /etc/apt/keyrings/docker.asc
             ],
             dry_run=dry_run,
         )
-    else:  # debian or fallback
-        print(f'Using generic Docker install for {distro or "unknown distro"}')
+    elif distro == "debian":
+        logger.info("Configuring Docker repository for Debian...")
+        run(
+            [
+                "curl",
+                "-sSL",
+                "https://get.docker.com",
+                "|",
+                "sh",
+            ],
+            dry_run=dry_run,
+        )
+        run(["apt", "update"], dry_run=dry_run)
+        run(
+            [
+                "apt",
+                "install",
+                "-y",
+                "docker-ce",
+                "docker-ce-cli",
+                "containerd.io",
+                "docker-buildx-plugin",
+                "docker-compose-plugin",
+            ],
+            dry_run=dry_run,
+        )
+
+    else:  # fallback
+        logger.info(f'Using generic Docker install for {distro or "unknown distro"}')
         run(["apt", "update"], dry_run=dry_run)
         run(["apt", "install", "-y", "docker.io", "docker-compose"], dry_run=dry_run)
     run(["systemctl", "enable", "--now", "docker"], dry_run=dry_run, check=False)
     if not dry_run:
         try:
             user = os.environ.get("SUDO_USER", os.environ.get("USER", "root"))
-            print(f"Adding user {user} to docker group")
+            logger.info(f"Adding user {user} to docker group")
             subprocess.run(["usermod", "-aG", "docker", user])
+            # sudo chmod 666 /var/run/docker.sock
+            subprocess.run(["sudo", "chmod", "660", "/var/run/docker.sock"], check=True)
         except Exception as e:
-            print(f"Warning: could not add user to docker group: {e}")
+            logger.warning(f"could not add user to docker group: {e}")
 
 
-# --------------------- Geoip Download ---------------------
+# Geoip Download
 
 
 def download_geoip_files(dry_run: bool):
@@ -344,11 +388,11 @@ def download_geoip_files(dry_run: bool):
         ),
     }
 
-    print("Downloading geoip files...")
+    logger.info("Downloading geoip files...")
     if dry_run:
-        print(f"(dry-run) Would create {geoip_dir}")
+        logger.info(f"(dry-run) Would create {geoip_dir}")
         for name in files:
-            print(f"(dry-run) Would download {name}")
+            logger.info(f"(dry-run) Would download {name}")
         return
 
     # Ensure geoip directory exists
@@ -357,39 +401,39 @@ def download_geoip_files(dry_run: bool):
     for name, url in files.items():
         dest = geoip_dir / name
         try:
-            print(f"  Downloading {name}...")
+            logger.info(f"  Downloading {name}...")
             with urllib.request.urlopen(url) as response:
                 content = response.read()
                 dest.write_bytes(content)
                 # Calculate MD5
                 md5 = hashlib.md5(content).hexdigest()
-                print(f"  {name} (MD5: {md5[:16]}...)")
+                logger.info(f"  {name} (MD5: {md5[:16]}...)")
         except Exception as e:
-            print(f"  Warning: failed to download {name}: {e}")
+            logger.warning(f"  failed to download {name}: {e}")
 
 
-# --------------------- Confirmation ---------------------
+# Confirmation
 
 
 def confirm_settings(
     env: Dict[str, str], servers: List[Dict[str, str]], dry_run: bool
 ) -> bool:
     """Display detected settings and ask for confirmation."""
-    print("\n" + "=" * 60)
-    print("Detected configuration:")
-    print("=" * 60)
-    print(f"  Architecture:  {env.get('ARCH', 'N/A')}")
-    print(f"  Interface:     {env.get('IFACE', 'N/A')}")
-    print(f"  IP Address:    {env.get('ADDR', 'N/A')}")
-    print(f"  Network:       {env.get('LAN', 'N/A')}")
-    print(f"\n  Servers ({len(servers)}):")
+    logger.info("\n" + "=" * 60)
+    logger.info("Detected configuration:")
+    logger.info("=" * 60)
+    logger.info(f"  Architecture:  {env.get('ARCH', 'N/A')}")
+    logger.info(f"  Interface:     {env.get('IFACE', 'N/A')}")
+    logger.info(f"  IP Address:    {env.get('ADDR', 'N/A')}")
+    logger.info(f"  Network:       {env.get('LAN', 'N/A')}")
+    logger.info(f"\n  Servers ({len(servers)}):")
     for idx, s in enumerate(servers, start=1):
         tag = "proxy" if idx == 1 else f"proxy{idx}"
-        print(f"    [{tag}] {s['host']} (UUID: {s['uuid'][:8]}...)")
-    print("=" * 60)
+        logger.info(f"    [{tag}] {s['host']} (UUID: {s['uuid'][:8]}...)")
+    logger.info("=" * 60)
 
     if dry_run:
-        print("\nDRY-RUN mode: no changes will be applied\n")
+        logger.info("DRY-RUN mode: no changes will be applied")
         return True
 
     while True:
@@ -397,18 +441,18 @@ def confirm_settings(
         if response == "" or response.lower() in ["y", "yes"]:
             return True
         elif response.lower() in ["n", "no"]:
-            print("Installation cancelled by user.")
+            logger.info("Installation cancelled by user.")
             return False
         else:
-            print("Please enter 'y' or 'n'")
+            logger.warning("Please enter 'y' or 'n'")
 
 
-# --------------------- Main ---------------------
+# Main
 
 
 def main():
     if os.geteuid() != 0:
-        print("Must be run as root (sudo). Exiting.")
+        logger.error("Must be run as root (sudo). Exiting.")
         return 1
     parser = argparse.ArgumentParser(
         description="XRAY client installer (Python, dynamic servers)"
@@ -440,12 +484,12 @@ def main():
         try:
             servers = parse_servers(args.server)
         except ValueError as e:
-            print(str(e))
+            logger.error(e)
             return 2
 
         # If .env exists, update only SERVERS, keep network settings
         if env and all(k in env for k in ["ARCH", "IFACE", "ADDR", "LAN"]):
-            print("Updating servers, keeping existing network settings.")
+            logger.info("Updating servers, keeping existing network settings.")
             env["SERVERS"] = servers_to_env_value(servers)
             write_env(env, dry_run)
         else:
@@ -469,21 +513,18 @@ def main():
         servers = servers_from_env_value(env["SERVERS"])
         if servers:
             using_existing = True
-            print("Using existing .env values.")
+            logger.info("Using existing .env values.")
         else:
-            print("SERVERS in .env is empty. " "Provide --server host:uuid argument.")
+            logger.error("SERVERS in .env is empty. Provide --server host:uuid argument.")
             return 2
 
         # Check all required keys present
         missing = [k for k in REQUIRED_ENV_KEYS if k not in env]
         if missing:
-            print(
-                f".env missing keys: {missing}. "
-                "Use --force with --server to regenerate."
-            )
+            logger.error(f".env missing keys: {missing}.\nUse --force with --server to regenerate.")
             return 2
     else:
-        print(
+        logger.error(
             "No .env found and no --server argument provided. "
             "Provide at least one --server host:uuid argument."
         )
@@ -508,17 +549,17 @@ def main():
     # docker compose
     compose_file = CLIENT_DIR / "docker-compose.yml"
     if not compose_file.exists():
-        print("WARNING: docker-compose.yml not found; skipping docker compose up.")
+        logger.warning("docker-compose.yml not found; skipping docker compose up.")
     else:
         if dry_run:
-            print("(dry-run) docker compose up -d")
+            logger.info("(dry-run) docker compose up -d")
         else:
             run(["docker", "compose", "up", "-d"], dry_run=False, check=False)
 
-    print("Done.")
-    print("Run and Startup:\n  docker-compose up -d")
-    print("Test SOCKS5: curl http://ifconfig.me/ip --socks5 127.0.0.1:1080")
-    print("Test via tun (if tun0): curl http://ifconfig.me/ip --interface tun0")
+    logger.info("Done.")
+    logger.info("Run and Startup:\n  docker-compose up -d")
+    logger.info("Test SOCKS5: curl http://ifconfig.me/ip --socks5 127.0.0.1:1080")
+    logger.info("Test via tun (if tun0): curl http://ifconfig.me/ip --interface tun0")
     return 0
 
 

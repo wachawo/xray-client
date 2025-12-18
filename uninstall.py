@@ -20,22 +20,37 @@ Exit codes:
   >0 runtime errors
 """
 import argparse
+import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional
 
+
+LOGGING = {
+    "handlers": [
+        logging.StreamHandler(),
+        # logging.FileHandler(filename='app.log', mode='a', encoding='utf-8'),
+    ],
+    "format": "%(asctime)s.%(msecs)03d [%(levelname)s]: (%(name)s.%(funcName)s) %(message)s",
+    "level": logging.INFO,
+    "datefmt": "%Y-%m-%d %H:%M:%S",
+}
+logging.basicConfig(**LOGGING)
+logger = logging.getLogger(__name__)
+
+
 CLIENT_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = CLIENT_DIR / "config_client.json"
 ENV_FILE = CLIENT_DIR / ".env"
 CONTAINERS = ["xray_server", "xray_tun2socks"]
 
-# --------------------- helpers ---------------------
 
+# Helpers
 
 def run(cmd: List[str], check: bool = True, capture: bool = True) -> Optional[str]:
-    print("+", " ".join(cmd))
+    logger.info(f"+ {' '.join(cmd)}")
     try:
         result = subprocess.run(
             cmd,
@@ -71,31 +86,31 @@ def get_container_image_id(name: str) -> Optional[str]:
 
 def remove_container(name: str, dry_run: bool):
     if not container_exists(name):
-        print(f"- Container {name} not found (skip)")
+        logger.info(f"- Container {name} not found (skip)")
         return
     if dry_run:
-        print(f"(dry-run) Would remove container {name}")
+        logger.info(f"(dry-run) Would remove container {name}")
         return
     run(["docker", "rm", "-f", name], check=False)
 
 
 def remove_image(image_id: str, dry_run: bool):
     if dry_run:
-        print(f"(dry-run) Would remove image {image_id}")
+        logger.info(f"(dry-run) Would remove image {image_id}")
         return
     run(["docker", "rmi", image_id], check=False)
 
 
 def summarize(dry_run: bool, remove_env: bool):
-    print("\nTargets:")
+    logger.info("Targets:")
     for c in CONTAINERS:
-        print(f"  - container: {c}")
-    print(f"  - file: {CONFIG_FILE} (if exists)")
+        logger.info(f"  - container: {c}")
+    logger.info(f"  - file: {CONFIG_FILE} (if exists)")
     if remove_env:
-        print(f"  - file: {ENV_FILE} (will remove)")
-    print("  - image: tun2socks build image (if found)")
+        logger.info(f"  - file: {ENV_FILE} (will remove)")
+    logger.info("  - image: tun2socks build image (if found)")
     if dry_run:
-        print("\nDRY-RUN: no changes will be applied")
+        logger.info("DRY-RUN: no changes will be applied")
 
 
 def confirm(dry_run: bool) -> bool:
@@ -106,17 +121,14 @@ def confirm(dry_run: bool) -> bool:
         if ans in ["", "y", "yes"]:
             return True
         if ans in ["n", "no"]:
-            print("Aborted by user.")
+            logger.info("Aborted by user.")
             return False
-        print("Please answer y or n.")
-
-
-# --------------------- main ---------------------
+        logger.warning("Please answer y or n.")
 
 
 def main() -> int:
     if os.geteuid() != 0:
-        print("Must be run as root (sudo). Exiting.")
+        logger.error("Must be run as root (sudo). Exiting.")
         return 2
 
     parser = argparse.ArgumentParser(description="Uninstall Xray client and tun2socks")
@@ -133,7 +145,7 @@ def main() -> int:
     remove_env = args.remove_env
 
     if not docker_available():
-        print("Docker not found. Only files will be removed.")
+        logger.warning("Docker not found. Only files will be removed.")
 
     summarize(dry_run, remove_env)
 
@@ -157,35 +169,35 @@ def main() -> int:
         if len(tun2socks_image_id) > 8:
             remove_image(tun2socks_image_id, dry_run)
         else:
-            print(f"Skip image removal (unexpected id: {tun2socks_image_id})")
+            logger.warning(f"Skip image removal (unexpected id: {tun2socks_image_id})")
 
     # Remove config file
     if CONFIG_FILE.exists():
         if dry_run:
-            print(f"(dry-run) Would delete {CONFIG_FILE}")
+            logger.info(f"(dry-run) Would delete {CONFIG_FILE}")
         else:
             try:
                 CONFIG_FILE.unlink()
-                print(f"Removed {CONFIG_FILE}")
+                logger.info(f"Removed {CONFIG_FILE}")
             except Exception as e:
-                print(f"Warning: failed to remove {CONFIG_FILE}: {e}")
+                logger.warning(f"Failed to remove {CONFIG_FILE}: {e}")
     else:
-        print(f"{CONFIG_FILE} not present (skip)")
+        logger.info(f"{CONFIG_FILE} not present (skip)")
 
     # Optional remove .env
     if remove_env and ENV_FILE.exists():
         if dry_run:
-            print(f"(dry-run) Would delete {ENV_FILE}")
+            logger.info(f"(dry-run) Would delete {ENV_FILE}")
         else:
             try:
                 ENV_FILE.unlink()
-                print(f"Removed {ENV_FILE}")
+                logger.info(f"Removed {ENV_FILE}")
             except Exception as e:
-                print(f"Warning: failed to remove {ENV_FILE}: {e}")
+                logger.warning(f"Failed to remove {ENV_FILE}: {e}")
     elif remove_env:
-        print(f"{ENV_FILE} not present (skip)")
+        logger.info(f"{ENV_FILE} not present (skip)")
 
-    print("\nUninstall complete.")
+    logger.info("Uninstall complete.")
     return 0
 
 
