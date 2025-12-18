@@ -3,3 +3,5 @@ Type=oneshot
 EnvironmentFile=/opt/xray/.env
 ExecStart=/usr/local/sbin/tproxy.sh
 RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
