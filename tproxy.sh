@@ -17,9 +17,9 @@ touch /etc/iproute2/rt_tables
 grep -Eq "^[[:space:]]*${TABLE}[[:space:]]+" /etc/iproute2/rt_tables \
   || echo "${TABLE} tproxy" >> /etc/iproute2/rt_tables
 # Flush routes
-ip rule del pref 99 fwmark "${MARK}" lookup "${TABLE}" 2>/dev/null || true
 ip route del local 0.0.0.0/0 dev lo table "${TABLE}" 2>/dev/null || true
 ip route del "${LAN}" dev "${IFACE}" table "${TABLE}" 2>/dev/null || true
+ip rule del pref 99 fwmark "${MARK}" lookup "${TABLE}" 2>/dev/null || true
 # Add routes
 ip route add local 0.0.0.0/0 dev lo table "${TABLE}"
 ip route add "${LAN}" dev "${IFACE}" table "${TABLE}"
