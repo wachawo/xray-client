@@ -333,15 +333,10 @@ Signed-By: /etc/apt/keyrings/docker.asc
     elif distro == "debian":
         logger.info("Configuring Docker repository for Debian...")
         run(
-            [
-                "curl",
-                "-sSL",
-                "https://get.docker.com",
-                "|",
-                "sh",
-            ],
-            dry_run=dry_run,
+            ["curl", "-fsSL", "https://get.docker.com", "-o", "/tmp/get-docker.sh"],
+            dry_run = dry_run,
         )
+        run(["sh", "/tmp/get-docker.sh"], dry_run=dry_run)
         run(["apt", "update"], dry_run=dry_run)
         run(
             [
